@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ScribeMind | Real-Time AI Communication Assistant</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #0d0f14;
+            --accent-color: #10b981; /* Emerald */
+            --accent-glow: rgba(16, 185, 129, 0.3);
+            --glass-bg: rgba(255, 255, 255, 0.05);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --text-primary: #f3f4f6;
+            --text-secondary: #9ca3af;
+            --card-hover: rgba(255, 255, 255, 0.08);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            overflow: hidden;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* --- Header --- */
+        header {
+            padding: 2rem 3rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--glass-border);
+            backdrop-filter: blur(10px);
+            z-index: 100;
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 700;
+            letter-spacing: -0.05em;
+            background: linear-gradient(to right, #10b981, #3b82f6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .status-container {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #ef4444; /* Idle red */
+            box-shadow: 0 0 10px rgba(239, 68, 68, 0.5);
+            transition: all 0.3s ease;
+        }
+
+        .status-dot.active {
+            background: var(--accent-color);
+            box-shadow: 0 0 10px var(--accent-glow);
+        }
+
+        /* --- Main Layout --- */
+        main {
+            display: grid;
+            grid-template-columns: 1fr 400px;
+            gap: 2rem;
+            padding: 2rem 3rem;
+            flex-grow: 1;
+            overflow: hidden;
+        }
+
+        /* --- Transcript Area --- */
+        .transcript-section {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            height: 100%;
+            position: relative;
+        }
+
+        .transcript-container {
+            flex-grow: 1;
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            padding: 2rem;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            scroll-behavior: smooth;
+        }
+
+        .transcript-container::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .transcript-container::-webkit-scrollbar-thumb {
+            background: var(--glass-border);
+            border-radius: 10px;
+        }
+
+        .transcript-line {
+            padding: 0.8rem 1.2rem;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.03);
+            border-left: 3px solid transparent;
+            animation: fadeIn 0.4s ease-out;
+        }
+
+        .transcript-line.recent {
+            border-left-color: var(--accent-color);
+            background: rgba(16, 185, 129, 0.05);
+        }
+
+        .interim-text {
+            color: var(--text-secondary);
+            font-style: italic;
+            margin-top: 0.5rem;
+        }
+
+        /* --- Controls --- */
+        .controls {
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+            background: var(--glass-bg);
+            padding: 1rem 2rem;
+            border-radius: 50px;
+            border: 1px solid var(--glass-border);
+            width: fit-content;
+        }
+
+        button.mic-btn {
+            background: none;
+            border: 2px solid var(--accent-color);
+            color: var(--accent-color);
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            position: relative;
+        }
+
+        button.mic-btn.active {
+            background: var(--accent-color);
+            color: white;
+            box-shadow: 0 0 20px var(--accent-glow);
+            transform: scale(1.1);
+        }
+
+        button.mic-btn.active::after {
+            content: '';
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            border: 2px solid var(--accent-color);
+            animation: pulse 1.5s infinite;
+        }
+
+        .tone-selector {
+            display: flex;
+            gap: 0.5rem;
+            background: rgba(0,0,0,0.2);
+            padding: 4px;
+            border-radius: 25px;
+        }
+
+        .tone-option {
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: var(--text-secondary);
+        }
+
+        .tone-option.selected {
+            background: var(--glass-bg);
+            color: white;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+
+        /* --- API Settings --- */
+        .api-settings {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+        }
+
+        input.api-input {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid var(--glass-border);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            width: 200px;
+            outline: none;
+        }
+
+        /* --- Suggestions Sidebar --- */
+        .suggestions-sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            overflow-y: auto;
+        }
+
+        .sidebar-header {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .suggestion-card {
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            padding: 1.5rem;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+            animation: slideInRight 0.5s cubic-bezier(0.165, 0.84, 0.44, 1);
+        }
+
+        .suggestion-card:hover {
+            background: var(--card-hover);
+            transform: translateY(-4px);
+            border-color: rgba(255,255,255,0.2);
+        }
+
+        .intent-badge {
+            font-size: 0.7rem;
+            background: rgba(59, 130, 246, 0.2);
+            color: #60a5fa;
+            padding: 2px 8px;
+            border-radius: 4px;
+            margin-bottom: 0.8rem;
+            display: inline-block;
+        }
+
+        .suggestion-text {
+            line-height: 1.5;
+            font-size: 0.95rem;
+        }
+
+        .loading-shimmer {
+            width: 100%;
+            height: 100px;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.05), transparent);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+            border-radius: 16px;
+        }
+
+        /* --- Animations --- */
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 0.8; }
+            100% { transform: scale(1.8); opacity: 0; }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes slideInRight {
+            from { opacity: 0; transform: translateX(30px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        @keyframes shimmer {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+        }
+
+        /* --- Mobile Warning (Web Speech API is primary on desktop Chrome) --- */
+        .mobile-warning {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            background: #f59e0b;
+            color: black;
+            text-align: center;
+            padding: 10px;
+            font-weight: 600;
+            z-index: 1000;
+        }
+
+        @media screen and (max-width: 768px) {
+            main {
+                grid-template-columns: 1fr;
+            }
+            .suggestions-sidebar {
+                display: none; /* Hide for simplicity on mobile in POC */
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="mobile-warning" id="browser-warning">
+        Speech recognition works best in Desktop Chrome.
+    </div>
+
+    <header>
+        <div class="logo">ScribeMind</div>
+        <div class="api-settings">
+            <div class="status-container">
+                <div id="status-dot" class="status-dot"></div>
+                <span id="status-text" style="font-size: 0.8rem; color: var(--text-secondary);">Idle</span>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <section class="transcript-section">
+            <div class="transcript-container" id="transcript-container">
+                <div class="transcript-line">System: Microphone ready. Click the icon below to start listening.</div>
+            </div>
+            
+            <div id="interim-display" class="interim-text"></div>
+
+            <div class="controls">
+                <button class="mic-btn" id="mic-toggle" title="Toggle Microphone">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="22"></line></svg>
+                </button>
+                <div class="tone-selector">
+                    <div class="tone-option selected" data-tone="polite">Polite</div>
+                    <div class="tone-option" data-tone="neutral">Neutral</div>
+                    <div class="tone-option" data-tone="professional">Professional</div>
+                    <div class="tone-option" data-tone="aggressive">Aggressive</div>
+                </div>
+                <button id="clear-history" title="Clear History" style="background: none; border: 1px solid var(--glass-border); color: var(--text-secondary); padding: 8px 12px; border-radius: 20px; font-size: 0.75rem; cursor: pointer; transition: all 0.2s;">
+                    Clear
+                </button>
+            </div>
+        </section>
+
+        <section class="suggestions-sidebar">
+            <div class="sidebar-header">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+                Live Suggestions
+            </div>
+            <div id="suggestions-container">
+                <!-- Suggestions will appear here -->
+                <div style="color: var(--text-secondary); font-size: 0.9rem; text-align: center; margin-top: 2rem;">
+                    Start speaking to see suggestions...
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        // --- State Management ---
+        const state = {
+            isListening: false,
+            apiKey: localStorage.getItem('groq_api_key') || '',
+            currentTone: 'polite',
+            history: [],
+            lastSentText: '',
+            debounceTimer: null,
+            recognition: null
+        };
+
+        // --- DOM Elements ---
+        const micBtn = document.getElementById('mic-toggle');
+        const statusDot = document.getElementById('status-dot');
+        const statusText = document.getElementById('status-text');
+        const transcriptContainer = document.getElementById('transcript-container');
+        const interimDisplay = document.getElementById('interim-display');
+        const suggestionsContainer = document.getElementById('suggestions-container');
+        const apiKeyInput = document.getElementById('api-key');
+        const toneOptions = document.querySelectorAll('.tone-option');
+        const clearBtn = document.getElementById('clear-history');
+
+        // Initialize UI status
+        statusText.innerText = 'System Ready';
+
+        // Initialize Tone Selector
+        toneOptions.forEach(opt => {
+            opt.addEventListener('click', () => {
+                toneOptions.forEach(o => o.classList.remove('selected'));
+                opt.classList.add('selected');
+                state.currentTone = opt.dataset.tone;
+            });
+        });
+        
+        clearBtn.addEventListener('click', () => {
+            state.history = [];
+            state.lastSentText = '';
+            transcriptContainer.innerHTML = '<div class="transcript-line">System: Transcript cleared.</div>';
+            suggestionsContainer.innerHTML = '<div style="color: var(--text-secondary); font-size: 0.9rem; text-align: center; margin-top: 2rem;">Start speaking to see suggestions...</div>';
+            interimDisplay.innerText = '';
+        });
+
+        // --- Speech Recognition Setup ---
+        if ('webkitSpeechRecognition' in window) {
+            state.recognition = new webkitSpeechRecognition();
+            state.recognition.continuous = true;
+            state.recognition.interimResults = true;
+            state.recognition.lang = 'en-US';
+
+            state.recognition.onstart = () => {
+                state.isListening = true;
+                micBtn.classList.add('active');
+                statusDot.classList.add('active');
+                statusText.innerText = 'Listening...';
+            };
+
+            state.recognition.onerror = (event) => {
+                console.error('Speech recognition error:', event.error);
+                stopListening();
+            };
+
+            state.recognition.onend = () => {
+                if (state.isListening) {
+                    state.recognition.start(); // Auto-restart if we didn't explicitly stop
+                } else {
+                    stopListening();
+                }
+            };
+
+            state.recognition.onresult = (event) => {
+                let interimTranscript = '';
+                let finalTranscript = '';
+
+                for (let i = event.resultIndex; i < event.results.length; ++i) {
+                    const result = event.results[i];
+                    if (result.isFinal) {
+                        const transcript = result[0].transcript;
+                        const confidence = result[0].confidence;
+                        
+                        console.log(`Final transcript: "${transcript}" (Confidence: ${confidence})`);
+                        
+                        // Lowering threshold because some browsers return 0 on file://
+                        if (confidence >= 0) {
+                            addTranscriptLine(transcript);
+                            processText(transcript);
+                        }
+                    } else {
+                        interimTranscript += result[0].transcript;
+                    }
+                }
+
+                interimDisplay.innerText = interimTranscript;
+            };
+        } else {
+            document.getElementById('browser-warning').style.display = 'block';
+            document.getElementById('browser-warning').innerText = "Web Speech API not supported in this browser. Please use Chrome.";
+        }
+
+        function toggleListening() {
+            if (state.isListening) {
+                stopListening();
+            } else {
+                startListening();
+            }
+        }
+
+        function startListening() {
+            if (!state.recognition) return;
+            try {
+                state.recognition.start();
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        function stopListening() {
+            state.isListening = false;
+            if (state.recognition) state.recognition.stop();
+            micBtn.classList.remove('active');
+            statusDot.classList.remove('active');
+            statusText.innerText = 'Idle';
+            interimDisplay.innerText = '';
+        }
+
+        micBtn.addEventListener('click', toggleListening);
+
+        // --- Logic Functions ---
+
+        function addTranscriptLine(text) {
+            state.history.push(text);
+            if (state.history.length > 10) state.history.shift(); // Keep context managed
+
+            const line = document.createElement('div');
+            line.className = 'transcript-line recent';
+            line.innerText = text;
+            
+            // Remove 'recent' class from old lines
+            const oldLines = transcriptContainer.querySelectorAll('.transcript-line.recent');
+            oldLines.forEach(l => l.classList.remove('recent'));
+
+            transcriptContainer.appendChild(line);
+            transcriptContainer.scrollTop = transcriptContainer.scrollHeight;
+        }
+
+        function processText(text) {
+            // Debounce logic: wait for 2 seconds of silence or end of sentence before calling API
+            if (state.debounceTimer) clearTimeout(state.debounceTimer);
+            
+            state.debounceTimer = setTimeout(() => {
+                const combinedText = state.history.slice(-3).join(' ');
+                if (combinedText.length > 5 && combinedText !== state.lastSentText) {
+                    fetchSuggestions(combinedText);
+                    state.lastSentText = combinedText;
+                }
+            }, 2000);
+        }
+
+        async function fetchSuggestions(text) {
+            setLoading(true);
+
+            try {
+                const response = await fetch('http://localhost:8000/api/suggestions', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        text: text,
+                        tone: state.currentTone
+                    })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || "Server error");
+                }
+
+                const data = await response.json();
+                renderSuggestions(data);
+            } catch (err) {
+                console.error(err);
+                showSuggestionsError(err.message);
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        function setLoading(isLoading) {
+            if (isLoading) {
+                suggestionsContainer.innerHTML = `
+                    <div class="loading-shimmer"></div>
+                    <div class="loading-shimmer" style="margin-top: 1rem;"></div>
+                    <div class="loading-shimmer" style="margin-top: 1rem;"></div>
+                `;
+            }
+        }
+
+        function renderSuggestions(data) {
+            suggestionsContainer.innerHTML = '';
+            
+            if (data.suggestions && data.suggestions.length > 0) {
+                data.suggestions.forEach(s => {
+                    const card = document.createElement('div');
+                    card.className = 'suggestion-card';
+                    card.innerHTML = `
+                        <div class="intent-badge">${data.intent || 'Detected Intent'}</div>
+                        <div class="suggestion-text">${s}</div>
+                    `;
+                    card.addEventListener('click', () => {
+                        // In a real app, this might copy to clipboard or insert into text field
+                        navigator.clipboard.writeText(s);
+                        alert('Suggestion copied to clipboard!');
+                    });
+                    suggestionsContainer.appendChild(card);
+                });
+            } else {
+                suggestionsContainer.innerHTML = '<div style="color: var(--text-secondary);">No suggestions found. Try speaking more clearly.</div>';
+            }
+        }
+
+        function showSuggestionsError(msg) {
+            suggestionsContainer.innerHTML = `
+                <div style="color: #f87171; background: rgba(248, 113, 113, 0.1); padding: 1rem; border-radius: 12px; font-size: 0.85rem; border: 1px solid rgba(248, 113, 113, 0.2);">
+                    Error: ${msg}
+                </div>
+            `;
+        }
+
+    </script>
+</body>
+</html>
