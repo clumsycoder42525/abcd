@@ -1,6 +1,7 @@
 import os
 import json
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
@@ -27,6 +28,10 @@ app.add_middleware(
 class SuggestionRequest(BaseModel):
     text: str
     tone: str
+
+@app.get("/")
+def serve_ui():
+    return FileResponse("index.html")
 
 @app.get("/health")
 async def health_check():
