@@ -41,6 +41,7 @@ app.add_middleware(
 class SuggestionRequest(BaseModel):
     text: str
     tone: str
+    system_prompt: str
 
 
 def _extract_json(text: str) -> dict | None:
@@ -89,35 +90,29 @@ async def get_suggestions(request: SuggestionRequest):
     if not GROQ_API_KEY:
         raise HTTPException(status_code=500, detail="API Key not configured on server.")
 
-    prompt = f"""
-    You are a real-time communication assistant. 
-    Analyze the following transcript of a person speaking.
-    Transcript: "{request.text}"
-    Tone: {request.tone}
-
-    Provide a structured JSON response with:
-    1. "intent": A very short summary of what the user is trying to communicate (max 5 words).
-    2. "suggestions": An array of 3 highly effective, concise response suggestions based on the tone.
-
-    STRICT JSON ONLY. NO PROLOGUE OR EPILOGUE.
-    Format:
-    {{
-        "intent": "string",
-        "suggestions": ["str1", "str2", "str3"]
-    }}
-    """
+    # The system prompt is passed from the frontend. We append formatting instructions.
+    full_system_prompt = (
+        f"{request.system_prompt}\n\n"
+        f"The user's current tone preference is: {request.tone}.\n"
+        "STRICT INSTRUCTION: Respond ONLY with a valid JSON object. No explanation, no markdown blocks, no text before or after."
+        "The JSON MUST follow this schema:\n"
+        "{\n"
+        '  "intent": "string (max 5 words)",\n'
+        '  "suggestions": ["suggestion 1", "suggestion 2", "suggestion 3"]\n'
+        "}"
+    )
 
     payload = {
         "model": GROQ_MODEL,
         "messages": [
-            {"role": "system", "content": "You are a communication expert. Always respond with strict, valid JSON only — no markdown, no explanation."},
-            {"role": "user", "content": prompt}
+            {"role": "system", "content": full_system_prompt},
+            {"role": "user", "content": f"Conversation Context/Transcript:\n{request.text}"}
         ],
         "temperature": 0.7,
         "max_tokens": 512
     }
 
-    logger.info(f"Sending request to Groq API | model={GROQ_MODEL} | text_length={len(request.text)}")
+    logger.info(f"Sending request to Groq API | model={GROQ_MODEL} | context_length={len(request.text)}")
 
     async with httpx.AsyncClient() as client:
         try:
@@ -135,12 +130,12 @@ async def get_suggestions(request: SuggestionRequest):
                 logger.error(f"Groq API returned {response.status_code}: {response.text}")
                 raise HTTPException(
                     status_code=response.status_code,
-                    detail=f"Groq API error: {response.text}"
+                    detail=f"Groq API error (status {response.status_code})"
                 )
 
             data = response.json()
             content_str = data["choices"][0]["message"]["content"]
-            logger.info(f"Raw Groq response content: {content_str!r}")
+            logger.info(f"Raw Groq response received.")
 
             # Extract JSON robustly — handles markdown fences and leading/trailing text
             parsed = _extract_json(content_str)
